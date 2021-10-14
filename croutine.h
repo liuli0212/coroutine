@@ -15,7 +15,7 @@
 // Tasks[0] is the main task with system allocated stack.
 #define MAIN_TASK 0;
 
-enum TaskState {
+enum task_state {
     UNUSED,
     UNINITED,
     READY,
@@ -23,7 +23,7 @@ enum TaskState {
 };
 
 struct Task;
-typedef void (*Func)(struct Task*, void*);
+typedef void (*func)(struct Task*, void*);
 
 struct Task {
     // sp & bp will be setup in swtch.S
@@ -34,11 +34,11 @@ struct Task {
     void* stack;
 
     // Worker function entry.
-    Func entry;
+    func entry;
     void* arg;
 
     // State of the coroutine.
-    enum TaskState state;
+    enum task_state state;
 
     // id of Task.
     int id;
@@ -50,6 +50,6 @@ void yield(int cur_id);
 // Claim I am the main task with id 0.
 int claim_main_task();
 
-struct Task* GetTask(Func f, void* arg);
+struct Task* GetTask(func f, void* arg);
 
 #endif

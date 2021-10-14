@@ -9,6 +9,9 @@
 
 #include "croutine.h"
 
+// 'LIUL' to debug stack overflow.
+#define STACK_BOTTOM_MAGIC 0x4C49554CUL
+
 void swtch(struct Task* old, struct Task* new);
 
 static struct Task g_tasks[MAX_TASKS];
@@ -50,7 +53,7 @@ static void recycle_task(struct Task* task) {
 static void make_stack(struct Task* task) {
     void* sp = task->sp;
     sp -= sizeof(void*);
-    *(void **)(sp) = (void *)0;
+    *(void **)(sp) = (void *)STACK_BOTTOM_MAGIC;
     sp -= sizeof(void*);
     *(void **)(sp) = (void *)(task_entry);
     sp -= sizeof(void*);
@@ -63,7 +66,7 @@ static void make_stack(struct Task* task) {
     task->sp = sp;
 }
 
-struct Task* GetTask(Func f, void* arg) {
+struct Task* GetTask(func f, void* arg) {
     for (int i = 0; i < MAX_TASKS; ++i) {
         if (g_tasks[i].state != UNUSED) {
             continue;
@@ -73,6 +76,8 @@ struct Task* GetTask(Func f, void* arg) {
         task->state = UNINITED;
         task->id = i;
 
+        // This might not be right. Can be configed.
+        // Use mprotect to watch out stack overflow?
         static const int STACK_SIZE = 1024*1024*2;
         if (task->stack == NULL)
             task->stack = (void*)malloc(STACK_SIZE);
