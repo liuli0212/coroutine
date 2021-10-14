@@ -11,12 +11,12 @@
 
 void swtch(struct Task* old, struct Task* new);
 
-static struct Task gTasks[MAX_TASKS];
-static int gMaxTaskId = -1;
+static struct Task g_tasks[MAX_TASKS];
+static int g_max_taskid = -1;
 
 // Wrapper entry point for all coroutines.
 // It's stack should have been arranged.
-static void TaskEntry(struct Task* task) {
+static void task_entry(struct Task* task) {
     task->entry(task, task->arg);
     //
     // Done. Finished task won't be scheduled again.
@@ -27,9 +27,9 @@ static void TaskEntry(struct Task* task) {
     assert(0);
 }
 
-static void RecycleTask(struct Task* task) {
+static void recycle_task(struct Task* task) {
     // Not strictly right.
-    if (gMaxTaskId == task->id) gMaxTaskId--;
+    if (g_max_taskid == task->id) g_max_taskid--;
 
     task->state = UNUSED;
     task->id = -1;
@@ -39,7 +39,7 @@ static void RecycleTask(struct Task* task) {
 //  Prepare stack for coroutine's entry on its private stack.
 //  IMPORTANT: Stack should be the same as swtch function uses, high to low.
 //  |0          |
-//  |TaskEntry  |
+//  |task_entry  |
 //  |arg        | -> poped into %rdi
 //  |r12        |
 //  |r13        |
@@ -47,12 +47,12 @@ static void RecycleTask(struct Task* task) {
 //  |r15        |
 //  |rbx        |
 //  |rbp        | <- task->sp
-static void MakeStack(struct Task* task) {
+static void make_stack(struct Task* task) {
     void* sp = task->sp;
     sp -= sizeof(void*);
     *(void **)(sp) = (void *)0;
     sp -= sizeof(void*);
-    *(void **)(sp) = (void *)(TaskEntry);
+    *(void **)(sp) = (void *)(task_entry);
     sp -= sizeof(void*);
     *(void **)(sp) = (void *)(task);
 
@@ -65,11 +65,11 @@ static void MakeStack(struct Task* task) {
 
 struct Task* GetTask(Func f, void* arg) {
     for (int i = 0; i < MAX_TASKS; ++i) {
-        if (gTasks[i].state != UNUSED) {
+        if (g_tasks[i].state != UNUSED) {
             continue;
         }
 
-        struct Task* task = &gTasks[i];
+        struct Task* task = &g_tasks[i];
         task->state = UNINITED;
         task->id = i;
 
@@ -82,11 +82,11 @@ struct Task* GetTask(Func f, void* arg) {
         task->entry = f;
         task->arg = arg;
 
-        if (i > gMaxTaskId) {
-            gMaxTaskId = i;
+        if (i > g_max_taskid) {
+            g_max_taskid = i;
         }
 
-        MakeStack(task);
+        make_stack(task);
         return task;
     }
     fprintf(stderr, "Failed to find task slot.\n");
@@ -94,34 +94,34 @@ struct Task* GetTask(Func f, void* arg) {
 }
 
 void yield(int cur_id) {
-    // gTasks[0] is the main task, always in state READY.
+    // g_tasks[0] is the main task, always in state READY.
     int next = 0;
 
     // Implements a random picking strategy
     // TODO(liuli): Fix this... it is not right.
-    int start_id = random() % (gMaxTaskId + 1) + 1;
-    for (int i = start_id; i <= gMaxTaskId; ++i) {
-        if (gTasks[i].state == READY) {
+    int start_id = random() % (g_max_taskid + 1) + 1;
+    for (int i = start_id; i <= g_max_taskid; ++i) {
+        if (g_tasks[i].state == READY) {
             next = i;
             break;
-        } else if (gTasks[i].state == FINISHED) {
-            RecycleTask(&gTasks[i]);
+        } else if (g_tasks[i].state == FINISHED) {
+            recycle_task(&g_tasks[i]);
         }
     }
 
     if (next == cur_id) return;
 
-    struct Task* nextTask = &gTasks[next];
-    struct Task* curTask = &gTasks[cur_id];
+    struct Task* nextTask = &g_tasks[next];
+    struct Task* curTask = &g_tasks[cur_id];
     swtch(curTask, nextTask);
 }
 
 int claim_main_task() {
-    if (gMaxTaskId >= 0) return 1;
-    memset(&gTasks[0], 0, sizeof(gTasks[0]));
-    gTasks[0].state = READY;
-    gTasks[0].id = 0;
+    if (g_max_taskid >= 0) return 1;
+    memset(&g_tasks[0], 0, sizeof(g_tasks[0]));
+    g_tasks[0].state = READY;
+    g_tasks[0].id = 0;
 
-    gMaxTaskId = 0;
+    g_max_taskid = 0;
     return 0;
 }

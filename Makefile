@@ -10,6 +10,6 @@ croutine_test: swtch.o croutine.o
 	gcc $(CFLAGS) -o croutine_test croutine_test.c swtch.o croutine.o
 
 clean:
-	rm *.o
+	rm *.o croutine_test
 
 .PHONY: croutine_test
